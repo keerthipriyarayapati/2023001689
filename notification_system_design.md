@@ -284,3 +284,156 @@ FROM notifications
 WHERE notificationType = 'Placement'
 AND createdAt >= NOW() - INTERVAL '7 days';
 ```
+# Stage 4
+
+## Suggested Solutions
+
+### 1. Pagination
+
+Instead of loading all notifications, load only a limited number.
+
+Example:
+
+```http
+GET /api/v1/notifications?page=1&limit=20
+```
+
+Tradeoff:
+
+* Reduces DB load
+* User must load additional pages
+
+---
+
+### 2. Caching
+
+Store frequently accessed notifications in Redis.
+
+Flow:
+
+```text
+Client -> Cache -> Database
+```
+
+Tradeoff:
+
+* Faster response time
+* Additional memory usage
+* Cache invalidation required
+
+---
+
+### 3. Real-Time Notifications
+
+Use WebSockets to push new notifications instead of fetching repeatedly.
+
+Tradeoff:
+
+* Reduces API calls
+* Requires maintaining WebSocket connections
+
+---
+
+### 4. Database Indexing
+
+Create indexes on frequently queried columns.
+
+```sql
+CREATE INDEX idx_student_read
+ON notifications(studentID, isRead);
+```
+
+Tradeoff:
+
+* Faster reads
+* Slightly slower inserts and updates
+
+---
+
+### 5. Unread Count API
+
+Fetch notification count separately.
+
+```http
+GET /api/v1/notifications/unread/count
+```
+
+Tradeoff:
+
+* Faster page load
+* Requires an additional API endpoint
+
+# Stage 5
+
+## Shortcomings
+
+1. Processing is sequential and slow.
+2. If email sending fails, some students never receive notifications.
+3. No retry mechanism.
+4. A single failure can interrupt the process.
+5. Not suitable for 50,000 students.
+
+---
+
+## What If Email Failed For 200 Students?
+
+Those students would not receive the email.
+
+A retry mechanism is required to resend failed notifications.
+
+---
+
+## Reliable Design
+
+1. Save notification to database first.
+2. Push notification tasks to a queue.
+3. Workers process emails and app notifications.
+4. Failed jobs are retried automatically.
+
+---
+
+## Should Saving To DB And Sending Email Happen Together?
+
+No.
+
+Saving to DB and sending email should be separate.
+
+Reason:
+
+* Database save is fast and reliable.
+* Email service may fail or be slow.
+* Notifications remain stored even if email delivery fails.
+
+---
+
+## Revised Pseudocode
+
+```text
+function notify_all(student_ids, message):
+
+    for student_id in student_ids:
+
+        save_to_db(student_id, message)
+
+        add_to_email_queue(student_id, message)
+
+        add_to_app_queue(student_id, message)
+
+
+worker email_worker:
+
+    while queue_not_empty:
+
+        try:
+            send_email(student_id, message)
+
+        catch error:
+            retry_job()
+
+
+worker app_worker:
+
+    while queue_not_empty:
+
+        push_to_app(student_id, message)
+```
