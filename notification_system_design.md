@@ -207,3 +207,80 @@ FROM notifications
 WHERE studentId=1042
 ORDER BY createdAt DESC
 LIMIT 20 OFFSET 0;
+
+# Stage 3
+
+## Is the Query Accurate?
+
+Yes. The query correctly fetches unread notifications of a student ordered by creation time.
+
+```sql
+SELECT *
+FROM notifications
+WHERE studentID = 1042
+AND isRead = false
+ORDER BY createdAt ASC;
+```
+
+## Why Is It Slow?
+
+The notifications table contains about 5,000,000 records.
+
+Without proper indexes, the database scans a large number of rows before filtering and sorting the results.
+
+## Improvements
+
+Create a composite index:
+
+```sql
+CREATE INDEX idx_notifications_student_read_created
+ON notifications(studentID, isRead, createdAt);
+```
+
+Query remains:
+
+```sql
+SELECT *
+FROM notifications
+WHERE studentID = 1042
+AND isRead = false
+ORDER BY createdAt ASC;
+```
+
+## Likely Computation Cost
+
+Without index:
+
+```text
+O(N)
+```
+
+With index:
+
+```text
+O(log N)
+```
+
+---
+
+## Should We Add Indexes On Every Column?
+
+No.
+
+Reasons:
+
+1. Indexes consume storage.
+2. Inserts and updates become slower.
+3. Many indexes may never be used.
+4. Indexes should be created only for frequently queried columns.
+
+---
+
+## Students Who Received Placement Notifications In Last 7 Days
+
+```sql
+SELECT DISTINCT studentID
+FROM notifications
+WHERE notificationType = 'Placement'
+AND createdAt >= NOW() - INTERVAL '7 days';
+```
