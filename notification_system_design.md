@@ -437,3 +437,53 @@ worker app_worker:
 
         push_to_app(student_id, message)
 ```
+# Stage 6
+
+## Approach
+
+Priority is calculated using notification type and recency.
+
+Weights:
+
+* Placement = 3
+* Result = 2
+* Event = 1
+
+Priority Score:
+
+```text
+priorityScore = weight + recencyScore
+```
+
+Notifications are sorted by priority score and top 10 are returned.
+
+## Maintaining Top 10 Efficiently
+
+Use a Min Heap of size 10.
+
+When a new notification arrives:
+
+1. Calculate priority score.
+2. Compare with minimum score in heap.
+3. Replace if higher.
+4. Heap size remains 10.
+
+Time Complexity:
+
+```text
+O(log 10)
+```
+### Sample Output
+
+```text
+1. Placement - Amazon.com Inc. hiring
+2. Placement - Berkshire Hathaway Inc. hiring
+3. Placement - Berkshire Hathaway Inc. hiring
+4. Placement - Amazon.com Inc. hiring
+5. Placement - Nvidia Corporation hiring
+6. Placement - Marvell Technology Inc. hiring
+7. Result - mid-sem
+8. Result - mid-sem
+9. Result - end-sem
+10. Result - mid-sem
+```
