@@ -1,244 +1,209 @@
 # Stage 1
 
-## Notification System REST API Design
+## Core Actions
 
-### Core Actions Supported
-
-1. Create Notification
-2. Get All Notifications
-3. Get Notification By ID
+1. Get Notifications
+2. Get Notification By ID
+3. Create Notification
 4. Mark Notification As Read
 5. Delete Notification
-6. Filter Notifications By Type
-7. Get Unread Notifications Count
-
----
+6. Get Unread Count
+7. Filter Notifications By Type
 
 ## Common Headers
 
-```http
 Authorization: Bearer <token>
 Content-Type: application/json
-```
+Accept: application/json
 
----
+## GET /api/v1/notifications
 
-## 1. Create Notification
+Response
 
-### Endpoint
-
-```http
-POST /api/notifications
-```
-
-### Request Body
-
-```json
 {
-  "title": "Placement Drive",
-  "message": "TCS placement drive scheduled on Friday",
-  "type": "placement",
-  "priority": "high",
-  "recipientId": "user123"
-}
-```
-
-### Response
-
-```json
-{
-  "success": true,
-  "notificationId": "n101",
-  "message": "Notification created successfully"
-}
-```
-
----
-
-## 2. Get All Notifications
-
-### Endpoint
-
-```http
-GET /api/notifications
-```
-
-### Response
-
-```json
-{
-  "success": true,
   "notifications": [
     {
-      "id": "n101",
+      "id": "uuid",
       "title": "Placement Drive",
-      "message": "TCS placement drive scheduled on Friday",
-      "type": "placement",
-      "priority": "high",
+      "message": "TCS Hiring",
+      "type": "Placement",
       "isRead": false,
-      "createdAt": "2026-06-07T10:00:00Z"
+      "createdAt": "2026-04-22T17:51:30Z"
     }
   ]
 }
-```
 
----
+## GET /api/v1/notifications/{id}
 
-## 3. Get Notification By ID
+Response
 
-### Endpoint
-
-```http
-GET /api/notifications/{id}
-```
-
-### Response
-
-```json
 {
-  "success": true,
-  "notification": {
-    "id": "n101",
-    "title": "Placement Drive",
-    "message": "TCS placement drive scheduled on Friday",
-    "type": "placement",
-    "priority": "high",
-    "isRead": false
-  }
+  "id": "uuid",
+  "title": "Placement Drive",
+  "message": "TCS Hiring",
+  "type": "Placement",
+  "isRead": false,
+  "createdAt": "2026-04-22T17:51:30Z"
 }
-```
 
----
+## POST /api/v1/notifications
 
-## 4. Mark Notification As Read
+Request
 
-### Endpoint
-
-```http
-PATCH /api/notifications/{id}/read
-```
-
-### Request Body
-
-```json
 {
-  "isRead": true
+  "studentId": 1042,
+  "title": "Placement Drive",
+  "message": "TCS Hiring",
+  "type": "Placement"
 }
-```
 
-### Response
+Response
 
-```json
 {
-  "success": true,
-  "message": "Notification marked as read"
+  "message": "Notification Created"
 }
-```
 
----
+## PATCH /api/v1/notifications/{id}/read
 
-## 5. Delete Notification
+Response
 
-### Endpoint
-
-```http
-DELETE /api/notifications/{id}
-```
-
-### Response
-
-```json
 {
-  "success": true,
-  "message": "Notification deleted successfully"
+  "message": "Notification Marked As Read"
 }
-```
 
----
+## DELETE /api/v1/notifications/{id}
 
-## 6. Filter Notifications
+Response
 
-### Endpoint
-
-```http
-GET /api/notifications?type=placement
-```
-
-### Response
-
-```json
 {
-  "success": true,
+  "message": "Notification Deleted"
+}
+
+## GET /api/v1/notifications/unread/count
+
+Response
+
+{
+  "count": 5
+}
+
+## GET /api/v1/notifications?type=Placement
+
+Response
+
+{
   "notifications": []
 }
-```
 
----
+## Real-Time Notification Mechanism
 
-## 7. Get Unread Notifications Count
+Technology: WebSocket
 
-### Endpoint
+Flow:
 
-```http
-GET /api/notifications/unread/count
-```
+1. Client connects to WebSocket server.
+2. New notification created.
+3. Server pushes notification instantly.
+4. Client updates UI without refresh.
 
-### Response
+# Stage 2
 
-```json
-{
-  "success": true,
-  "unreadCount": 5
-}
-```
+## Database
 
----
+PostgreSQL
 
-# JSON Notification Schema
+## Schema
 
-```json
-{
-  "id": "string",
-  "title": "string",
-  "message": "string",
-  "type": "event | placement | result | general",
-  "priority": "low | medium | high",
-  "recipientId": "string",
-  "isRead": false,
-  "createdAt": "timestamp"
-}
-```
+CREATE TABLE students (
+    id INT PRIMARY KEY,
+    name VARCHAR(100),
+    email VARCHAR(100)
+);
 
----
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY,
+    studentId INT,
+    title VARCHAR(255),
+    message TEXT,
+    notificationType VARCHAR(20),
+    isRead BOOLEAN DEFAULT FALSE,
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (studentId) REFERENCES students(id)
+);
 
-# Real-Time Notification Mechanism
+## Problems At Scale
 
-The system uses WebSockets for real-time notification delivery.
+1. Slow notification retrieval
+2. Large table size
+3. High concurrent requests
 
-## Flow
+## Solutions
 
-1. User logs in.
-2. Client establishes WebSocket connection.
-3. Backend stores active connection.
-4. When a new notification is created, backend pushes notification instantly.
-5. Frontend updates notification panel without page refresh.
+1. Indexing
+2. Pagination
+3. Archiving old notifications
+4. Read replicas
 
-### WebSocket Endpoint
+## Indexes
 
-```http
-ws://localhost:3000/ws/notifications
-```
+CREATE INDEX idx_student_read
+ON notifications(studentId,isRead);
 
-### Real-Time Message Format
+CREATE INDEX idx_created_at
+ON notifications(createdAt);
 
-```json
-{
-  "event": "NEW_NOTIFICATION",
-  "data": {
-    "id": "n101",
-    "title": "Placement Drive",
-    "message": "TCS placement drive scheduled on Friday",
-    "priority": "high"
-  }
-}
-```
+## Queries
+
+-- Create Notification
+
+INSERT INTO notifications
+(id,studentId,title,message,notificationType)
+VALUES
+(uuid_generate_v4(),1042,'Placement Drive',
+'TCS Hiring','Placement');
+
+-- Get Notifications
+
+SELECT *
+FROM notifications
+WHERE studentId=1042
+ORDER BY createdAt DESC;
+
+-- Get Notification By ID
+
+SELECT *
+FROM notifications
+WHERE id='notification-id';
+
+-- Mark As Read
+
+UPDATE notifications
+SET isRead=true
+WHERE id='notification-id';
+
+-- Delete Notification
+
+DELETE FROM notifications
+WHERE id='notification-id';
+
+-- Filter By Type
+
+SELECT *
+FROM notifications
+WHERE studentId=1042
+AND notificationType='Placement';
+
+-- Unread Count
+
+SELECT COUNT(*)
+FROM notifications
+WHERE studentId=1042
+AND isRead=false;
+
+-- Pagination
+
+SELECT *
+FROM notifications
+WHERE studentId=1042
+ORDER BY createdAt DESC
+LIMIT 20 OFFSET 0;
